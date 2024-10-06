@@ -1,9 +1,15 @@
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import accuracy_score
 import joblib
+import nltk
+from nltk.corpus import stopwords
+import string
+
+# Ensure NLTK stopwords are downloaded
+nltk.download('stopwords')
 
 # Expanded dataset of product reviews with categories
 data = {
@@ -79,27 +85,50 @@ new_categories = ['appliances', 'appliances', 'appliances', 'appliances', 'appli
 df_new = pd.DataFrame({'review': new_reviews, 'category': new_categories})
 df_updated = pd.concat([df, df_new], ignore_index=True)
 
+# Preprocessing function to clean and lemmatize text
+def preprocess_text(text):
+    stop_words = set(stopwords.words('english'))
+    text = text.lower()
+    text = "".join([char for char in text if char not in string.punctuation])
+    words = [word for word in text.split() if word not in stop_words]
+    return " ".join(words)
+
+# Apply preprocessing to all reviews
+df_updated['cleaned_review'] = df_updated['review'].apply(preprocess_text)
+
 # Split the dataset into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(df_updated['review'], df_updated['category'], test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(df_updated['cleaned_review'], df_updated['category'], test_size=0.2, random_state=42)
 
 # Preprocess the updated text data using n-grams (unigrams + bigrams)
-tfidf_vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
+tfidf_vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_df=0.85, min_df=2)
 X_tfidf_train = tfidf_vectorizer.fit_transform(X_train)
 X_tfidf_test = tfidf_vectorizer.transform(X_test)
 
-# Train the Logistic Regression classifier with hyperparameter tuning
-log_reg_classifier = LogisticRegression(max_iter=2000, C=0.8, solver='liblinear')
-log_reg_classifier.fit(X_tfidf_train, y_train)
+# Train SVM classifier with hyperparameter tuning
+svm_classifier = SVC()
+
+# Perform hyperparameter tuning using GridSearchCV
+param_grid = {
+    'C': [0.1, 1, 10],
+    'kernel': ['linear', 'rbf'],
+    'gamma': [1, 0.1, 0.01]
+}
+
+grid_search = GridSearchCV(svm_classifier, param_grid, cv=3)
+grid_search.fit(X_tfidf_train, y_train)
+
+# Get the best estimator after tuning
+best_svm_classifier = grid_search.best_estimator_
 
 # Make predictions on the test set
-y_pred = log_reg_classifier.predict(X_tfidf_test)
+y_pred = best_svm_classifier.predict(X_tfidf_test)
 
 # Calculate the accuracy
 accuracy = accuracy_score(y_test, y_pred)
 
 # Save the retrained model and vectorizer
-joblib.dump(log_reg_classifier, 'log_reg_classifier_updated.pkl')
+joblib.dump(best_svm_classifier, 'svm_classifier_updated.pkl')
 joblib.dump(tfidf_vectorizer, 'tfidf_vectorizer_updated.pkl')
 
 # Print the accuracy of the model
-print(f"Model retrained and saved with new appliance data! Accuracy on test set: {accuracy:.2f}")
+print(f"Model retrained with SVM and saved with new appliance data! Accuracy on test set: {accuracy:.2f}")
