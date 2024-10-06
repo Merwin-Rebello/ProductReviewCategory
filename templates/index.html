@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Review Categorization</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Product Review Categorization</h1>
+        <form action="/predict" method="post">
+            <textarea name="review" placeholder="Enter your product review here..." required></textarea>
+            <button type="submit">Predict Category</button>
+        </form>
+
+        {% if review %}
+            <h2>Review: {{ review }}</h2>
+            <h3>Predicted Category: {{ category }}</h3>
+        {% endif %}
+    </div>
+</body>
+</html>
